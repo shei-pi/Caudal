@@ -120,7 +120,7 @@ def _create_transfer(data: TransactionCreate, db: Session) -> Transaction:
         raise HTTPException(status_code=404, detail="Cuenta no encontrada")
 
     tid = str(uuid.uuid4())
-    base = data.model_dump(exclude={"to_account_id", "tx_type", "description"})
+    base = data.model_dump(exclude={"to_account_id", "tx_type", "description", "account_id"})
 
     desc_out = data.description or f"Transferencia a {dest.name}"
     desc_in = data.description or f"Transferencia desde {source.name}"
