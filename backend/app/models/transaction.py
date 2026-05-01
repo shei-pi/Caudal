@@ -11,7 +11,7 @@ class Transaction(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     account_id: Mapped[int] = mapped_column(Integer, ForeignKey("accounts.id"), nullable=False)
-    date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    transaction_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     description: Mapped[str] = mapped_column(String(500), nullable=False)
     description_normalized: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
     amount: Mapped[float] = mapped_column(Float, nullable=False)

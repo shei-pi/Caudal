@@ -26,8 +26,8 @@ def get_spending_by_category(
 
     q = db.query(Transaction).filter(
         Transaction.tx_type == "debit",
-        Transaction.date >= date_from,
-        Transaction.date <= date_to,
+        Transaction.transaction_date >= date_from,
+        Transaction.transaction_date <= date_to,
     )
     if account_id:
         q = q.filter(Transaction.account_id == account_id)
@@ -79,8 +79,8 @@ def get_monthly_summary(db: Session, months: int = 12) -> MonthlySummaryResponse
             last_day = first_day.replace(month=first_day.month + 1, day=1) - timedelta(days=1)
 
         txs = db.query(Transaction).filter(
-            Transaction.date >= first_day,
-            Transaction.date <= last_day,
+            Transaction.transaction_date >= first_day,
+            Transaction.transaction_date <= last_day,
         ).all()
 
         income = sum(tx.amount for tx in txs if tx.tx_type == "credit")

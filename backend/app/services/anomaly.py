@@ -15,7 +15,7 @@ def detect_anomalies(db: Session, contamination: float = 0.05) -> int:
         {
             "id": tx.id,
             "amount": tx.amount,
-            "day_of_week": pd.Timestamp(tx.date).dayofweek,
+            "day_of_week": pd.Timestamp(tx.transaction_date).dayofweek,
             "category_id": tx.category_id or -1,
         }
         for tx in transactions

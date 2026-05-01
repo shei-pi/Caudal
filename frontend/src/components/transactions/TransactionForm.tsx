@@ -22,7 +22,7 @@ import dayjs from "dayjs";
 
 const schema = z.object({
   account_id: z.number({ required_error: "Requerido" }),
-  date: z.date({ required_error: "Requerido" }),
+  transaction_date: z.date({ required_error: "Requerido" }),
   description: z.string().min(1, "Requerido"),
   amount: z.number({ required_error: "Requerido" }).positive("Debe ser positivo"),
   tx_type: z.enum(["debit", "credit"]),
@@ -55,7 +55,7 @@ export default function TransactionForm({ opened, onClose, transaction }: Props)
     defaultValues: transaction
       ? {
           account_id: transaction.account_id,
-          date: new Date(transaction.date),
+          transaction_date: new Date(transaction.transaction_date),
           description: transaction.description,
           amount: transaction.amount,
           tx_type: transaction.tx_type,
@@ -97,7 +97,7 @@ export default function TransactionForm({ opened, onClose, transaction }: Props)
   const onSubmit = (values: FormValues) => {
     const payload = {
       ...values,
-      date: dayjs(values.date).format("YYYY-MM-DD"),
+      transaction_date: dayjs(values.transaction_date).format("YYYY-MM-DD"),
     };
     if (transaction) {
       updateMutation.mutate(payload);
@@ -139,14 +139,14 @@ export default function TransactionForm({ opened, onClose, transaction }: Props)
             )}
           />
           <Controller
-            name="date"
+            name="transaction_date"
             control={control}
             render={({ field }) => (
               <DateInput
                 label="Fecha"
                 value={field.value}
                 onChange={field.onChange}
-                error={errors.date?.message}
+                error={errors.transaction_date?.message}
                 valueFormat="DD/MM/YYYY"
                 locale="es"
                 required

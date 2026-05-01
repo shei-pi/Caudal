@@ -19,14 +19,14 @@ def _normalize_for_recurrence(desc: str) -> str:
 
 
 def detect_recurring(db: Session) -> int:
-    transactions = db.query(Transaction).order_by(Transaction.date).all()
+    transactions = db.query(Transaction).order_by(Transaction.transaction_date).all()
     if not transactions:
         return 0
 
     rows = [
         {
             "id": tx.id,
-            "date": pd.Timestamp(tx.date),
+            "date": pd.Timestamp(tx.transaction_date),
             "account_id": tx.account_id,
             "amount": tx.amount,
             "tx_type": tx.tx_type,

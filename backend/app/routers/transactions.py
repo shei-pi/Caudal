@@ -47,9 +47,9 @@ def list_transactions(
     if category_id is not None:
         q = q.filter(Transaction.category_id == category_id)
     if date_from:
-        q = q.filter(Transaction.date >= date_from)
+        q = q.filter(Transaction.transaction_date >= date_from)
     if date_to:
-        q = q.filter(Transaction.date <= date_to)
+        q = q.filter(Transaction.transaction_date <= date_to)
     if tx_type:
         q = q.filter(Transaction.tx_type == tx_type)
     if is_recurring is not None:
@@ -66,7 +66,7 @@ def list_transactions(
         )
 
     total = q.count()
-    items = q.order_by(Transaction.date.desc(), Transaction.id.desc()).offset(
+    items = q.order_by(Transaction.transaction_date.desc(), Transaction.id.desc()).offset(
         (page - 1) * page_size
     ).limit(page_size).all()
 
@@ -82,7 +82,7 @@ def list_transactions(
 @router.post("", response_model=TransactionRead, status_code=201)
 def create_transaction(data: TransactionCreate, db: Session = Depends(get_db)):
     desc_norm = normalize_description(data.description)
-    fingerprint = _make_fingerprint(data.date, desc_norm, data.amount, data.account_id)
+    fingerprint = _make_fingerprint(data.transaction_date, desc_norm, data.amount, data.account_id)
 
     existing = db.query(Transaction).filter(Transaction.hash_fingerprint == fingerprint).first()
     if existing:
@@ -110,7 +110,7 @@ def list_recurring(db: Session = Depends(get_db)):
     return (
         db.query(Transaction)
         .filter(Transaction.is_recurring == True)  # noqa: E712
-        .order_by(Transaction.date.desc())
+        .order_by(Transaction.transaction_date.desc())
         .limit(200)
         .all()
     )
@@ -121,7 +121,7 @@ def list_anomalies(db: Session = Depends(get_db)):
     return (
         db.query(Transaction)
         .filter(Transaction.is_anomaly == True)  # noqa: E712
-        .order_by(Transaction.date.desc())
+        .order_by(Transaction.transaction_date.desc())
         .limit(100)
         .all()
     )

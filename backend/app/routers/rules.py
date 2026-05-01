@@ -78,7 +78,7 @@ def test_rule(data: RuleTestRequest, db: Session = Depends(get_db)):
                 raise HTTPException(status_code=400, detail="Invalid regex pattern")
         if hit:
             matched.append(
-                {"id": tx.id, "date": str(tx.date), "description": tx.description, "amount": tx.amount}
+                {"id": tx.id, "date": str(tx.transaction_date), "description": tx.description, "amount": tx.amount}
             )
             if len(matched) >= data.limit:
                 break

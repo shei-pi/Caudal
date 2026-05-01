@@ -37,7 +37,7 @@ export interface CategorizationRule {
 export interface Transaction {
   id: number;
   account_id: number;
-  date: string;
+  transaction_date: string;
   description: string;
   description_normalized: string;
   amount: number;
