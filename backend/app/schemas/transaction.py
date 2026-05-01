@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date as Date, datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -7,7 +7,7 @@ from app.schemas.category import CategoryRead
 
 class TransactionBase(BaseModel):
     account_id: int
-    date: date
+    date: Date
     description: str
     amount: float
     tx_type: str  # debit, credit
@@ -21,7 +21,7 @@ class TransactionCreate(TransactionBase):
 
 
 class TransactionUpdate(BaseModel):
-    date: date | None = None
+    date: Date | None = None
     description: str | None = None
     amount: float | None = None
     tx_type: str | None = None
@@ -60,8 +60,8 @@ class TransactionCategorizeRequest(BaseModel):
 class TransactionFilter(BaseModel):
     account_id: int | None = None
     category_id: int | None = None
-    date_from: date | None = None
-    date_to: date | None = None
+    date_from: Date | None = None
+    date_to: Date | None = None
     tx_type: str | None = None
     is_recurring: bool | None = None
     is_anomaly: bool | None = None
