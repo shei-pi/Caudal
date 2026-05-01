@@ -3,7 +3,7 @@ import { Text } from "@mantine/core";
 interface Props {
   amount: number;
   currency?: string;
-  txType?: "debit" | "credit";
+  txType?: "debit" | "credit" | "transfer";
   size?: string;
   fw?: number;
 }

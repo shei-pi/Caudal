@@ -31,6 +31,7 @@ class Transaction(Base):
     import_job_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("import_jobs.id"), nullable=True
     )
+    transfer_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     external_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     hash_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     notes: Mapped[str | None] = mapped_column(String(500), nullable=True)

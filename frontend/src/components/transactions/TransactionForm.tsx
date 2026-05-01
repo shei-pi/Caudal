@@ -13,23 +13,34 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { accountsApi } from "@/api/accounts";
 import { categoriesApi } from "@/api/categories";
 import { transactionsApi } from "@/api/transactions";
 import type { Transaction } from "@/types";
 import dayjs from "dayjs";
 
-const schema = z.object({
-  account_id: z.number({ required_error: "Requerido" }),
-  transaction_date: z.date({ required_error: "Requerido" }),
-  description: z.string().min(1, "Requerido"),
-  amount: z.number({ required_error: "Requerido" }).positive("Debe ser positivo"),
-  tx_type: z.enum(["debit", "credit"]),
-  currency: z.string().default("ARS"),
-  category_id: z.number().nullable().optional(),
-  notes: z.string().optional(),
-});
+const schema = z
+  .object({
+    account_id: z.number({ required_error: "Requerido" }),
+    transaction_date: z.date({ required_error: "Requerido" }),
+    description: z.string().min(1, "Requerido"),
+    amount: z.number({ required_error: "Requerido" }).positive("Debe ser positivo"),
+    tx_type: z.enum(["debit", "credit", "transfer"]),
+    to_account_id: z.number().optional(),
+    currency: z.string().default("ARS"),
+    category_id: z.number().nullable().optional(),
+    notes: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.tx_type === "transfer" && !data.to_account_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Requerido",
+        path: ["to_account_id"],
+      });
+    }
+  });
 
 type FormValues = z.infer<typeof schema>;
 
@@ -58,7 +69,7 @@ export default function TransactionForm({ opened, onClose, transaction }: Props)
           transaction_date: new Date(transaction.transaction_date),
           description: transaction.description,
           amount: transaction.amount,
-          tx_type: transaction.tx_type,
+          tx_type: transaction.tx_type as "debit" | "credit" | "transfer",
           currency: transaction.currency,
           category_id: transaction.category_id,
           notes: transaction.notes ?? undefined,
@@ -69,8 +80,13 @@ export default function TransactionForm({ opened, onClose, transaction }: Props)
         },
   });
 
+  const txType = useWatch({ control, name: "tx_type" });
+  const selectedAccountId = useWatch({ control, name: "account_id" });
+  const isTransfer = txType === "transfer";
+
   const createMutation = useMutation({
-    mutationFn: (data: Partial<Transaction>) => transactionsApi.create(data),
+    mutationFn: (data: Partial<Transaction> & { to_account_id?: number }) =>
+      transactionsApi.create(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["spending-by-category"] });
@@ -110,6 +126,14 @@ export default function TransactionForm({ opened, onClose, transaction }: Props)
     value: String(a.id),
     label: `${a.name} (${a.currency})`,
   }));
+
+  const destAccountOptions = accounts
+    .filter((a) => a.id !== selectedAccountId)
+    .map((a) => ({
+      value: String(a.id),
+      label: `${a.name} (${a.currency})`,
+    }));
+
   const categoryOptions = [
     { value: "", label: "Sin categoría" },
     ...categories.map((c) => ({ value: String(c.id), label: c.name })),
@@ -129,7 +153,7 @@ export default function TransactionForm({ opened, onClose, transaction }: Props)
             control={control}
             render={({ field }) => (
               <Select
-                label="Cuenta"
+                label={isTransfer ? "Cuenta origen" : "Cuenta"}
                 data={accountOptions}
                 value={field.value ? String(field.value) : null}
                 onChange={(v) => field.onChange(v ? Number(v) : undefined)}
@@ -138,6 +162,38 @@ export default function TransactionForm({ opened, onClose, transaction }: Props)
               />
             )}
           />
+          <Controller
+            name="tx_type"
+            control={control}
+            render={({ field }) => (
+              <Select
+                label="Tipo"
+                data={[
+                  { value: "debit", label: "Débito (gasto)" },
+                  { value: "credit", label: "Crédito (ingreso)" },
+                  { value: "transfer", label: "Transferencia" },
+                ]}
+                value={field.value}
+                onChange={field.onChange}
+              />
+            )}
+          />
+          {isTransfer && (
+            <Controller
+              name="to_account_id"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Cuenta destino"
+                  data={destAccountOptions}
+                  value={field.value ? String(field.value) : null}
+                  onChange={(v) => field.onChange(v ? Number(v) : undefined)}
+                  error={errors.to_account_id?.message}
+                  required
+                />
+              )}
+            />
+          )}
           <Controller
             name="transaction_date"
             control={control}
@@ -191,35 +247,22 @@ export default function TransactionForm({ opened, onClose, transaction }: Props)
               )}
             />
           </Group>
-          <Controller
-            name="tx_type"
-            control={control}
-            render={({ field }) => (
-              <Select
-                label="Tipo"
-                data={[
-                  { value: "debit", label: "Débito (gasto)" },
-                  { value: "credit", label: "Crédito (ingreso)" },
-                ]}
-                value={field.value}
-                onChange={field.onChange}
-              />
-            )}
-          />
-          <Controller
-            name="category_id"
-            control={control}
-            render={({ field }) => (
-              <Select
-                label="Categoría"
-                data={categoryOptions}
-                value={field.value ? String(field.value) : ""}
-                onChange={(v) => field.onChange(v ? Number(v) : null)}
-                clearable
-                searchable
-              />
-            )}
-          />
+          {!isTransfer && (
+            <Controller
+              name="category_id"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Categoría"
+                  data={categoryOptions}
+                  value={field.value ? String(field.value) : ""}
+                  onChange={(v) => field.onChange(v ? Number(v) : null)}
+                  clearable
+                  searchable
+                />
+              )}
+            />
+          )}
           <Controller
             name="notes"
             control={control}

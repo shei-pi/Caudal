@@ -17,7 +17,7 @@ class TransactionBase(BaseModel):
 
 
 class TransactionCreate(TransactionBase):
-    pass
+    to_account_id: int | None = None  # only for tx_type="transfer"
 
 
 class TransactionUpdate(BaseModel):
@@ -43,6 +43,7 @@ class TransactionRead(TransactionBase):
     is_anomaly: bool
     anomaly_score: float | None
     source: str
+    transfer_id: str | None
     import_job_id: int | None
     hash_fingerprint: str
     created_at: datetime

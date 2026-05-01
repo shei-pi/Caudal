@@ -136,6 +136,7 @@ export default function Transactions() {
           data={[
             { value: "debit", label: "Débito" },
             { value: "credit", label: "Crédito" },
+            { value: "transfer", label: "Transferencia" },
           ]}
           value={typeFilter}
           onChange={(v) => { setTypeFilter(v || null); setPage(1); }}

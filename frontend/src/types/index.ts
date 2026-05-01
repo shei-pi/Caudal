@@ -41,13 +41,14 @@ export interface Transaction {
   description: string;
   description_normalized: string;
   amount: number;
-  tx_type: "debit" | "credit";
+  tx_type: "debit" | "credit" | "transfer";
   currency: string;
   amount_ars: number | null;
   amount_usd: number | null;
   exchange_rate_used: number | null;
   category_id: number | null;
   category: Category | null;
+  transfer_id: string | null;
   is_recurring: boolean;
   recurring_group_id: string | null;
   is_anomaly: boolean;

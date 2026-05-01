@@ -1,5 +1,6 @@
 import hashlib
 import math
+import uuid
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -81,6 +82,11 @@ def list_transactions(
 
 @router.post("", response_model=TransactionRead, status_code=201)
 def create_transaction(data: TransactionCreate, db: Session = Depends(get_db)):
+    if data.tx_type == "transfer":
+        if not data.to_account_id:
+            raise HTTPException(status_code=422, detail="to_account_id es requerido para transferencias")
+        return _create_transfer(data, db)
+
     desc_norm = normalize_description(data.description)
     fingerprint = _make_fingerprint(data.transaction_date, desc_norm, data.amount, data.account_id)
 
@@ -89,7 +95,7 @@ def create_transaction(data: TransactionCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Duplicate transaction detected")
 
     tx = Transaction(
-        **data.model_dump(),
+        **data.model_dump(exclude={"to_account_id"}),
         description_normalized=desc_norm,
         hash_fingerprint=fingerprint,
         source="manual",
@@ -103,6 +109,47 @@ def create_transaction(data: TransactionCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(tx)
     return tx
+
+
+def _create_transfer(data: TransactionCreate, db: Session) -> Transaction:
+    from app.models.account import Account as AccountModel
+
+    source = db.query(AccountModel).filter(AccountModel.id == data.account_id).first()
+    dest = db.query(AccountModel).filter(AccountModel.id == data.to_account_id).first()
+    if not source or not dest:
+        raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+
+    tid = str(uuid.uuid4())
+    base = data.model_dump(exclude={"to_account_id", "tx_type", "description"})
+
+    desc_out = data.description or f"Transferencia a {dest.name}"
+    desc_in = data.description or f"Transferencia desde {source.name}"
+
+    tx_out = Transaction(
+        **base,
+        account_id=data.account_id,
+        tx_type="transfer",
+        description=desc_out,
+        description_normalized=normalize_description(desc_out),
+        hash_fingerprint=_make_fingerprint(data.transaction_date, normalize_description(desc_out), data.amount, data.account_id),
+        transfer_id=tid,
+        source="manual",
+    )
+    tx_in = Transaction(
+        **base,
+        account_id=data.to_account_id,
+        tx_type="transfer",
+        description=desc_in,
+        description_normalized=normalize_description(desc_in),
+        hash_fingerprint=_make_fingerprint(data.transaction_date, normalize_description(desc_in), data.amount, data.to_account_id),
+        transfer_id=tid,
+        source="manual",
+    )
+    db.add(tx_out)
+    db.add(tx_in)
+    db.commit()
+    db.refresh(tx_out)
+    return tx_out
 
 
 @router.get("/recurring", response_model=list[TransactionRead])
@@ -154,7 +201,10 @@ def delete_transaction(tx_id: int, db: Session = Depends(get_db)):
     tx = db.query(Transaction).filter(Transaction.id == tx_id).first()
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
-    db.delete(tx)
+    if tx.transfer_id:
+        db.query(Transaction).filter(Transaction.transfer_id == tx.transfer_id).delete()
+    else:
+        db.delete(tx)
     db.commit()
 
 
