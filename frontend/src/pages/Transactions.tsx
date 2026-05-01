@@ -168,7 +168,7 @@ export default function Transactions() {
                   <Table.Tr key={tx.id}>
                     <Table.Td>
                       <Text size="sm" style={{ whiteSpace: "nowrap" }}>
-                        {dayjs(tx.date).format("DD/MM/YY")}
+                        {dayjs(tx.transaction_date).format("DD/MM/YY")}
                       </Text>
                     </Table.Td>
                     <Table.Td>

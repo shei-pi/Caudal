@@ -1,5 +1,6 @@
 import { NavLink, Stack } from "@mantine/core";
 import {
+  IconBuildingBank,
   IconChartBar,
   IconHome,
   IconLayoutDashboard,
@@ -15,6 +16,7 @@ interface Props {
 
 const NAV_ITEMS = [
   { path: "/", label: "Dashboard", icon: IconLayoutDashboard },
+  { path: "/accounts", label: "Cuentas", icon: IconBuildingBank },
   { path: "/transactions", label: "Movimientos", icon: IconList },
   { path: "/categories", label: "Categorías", icon: IconTag },
   { path: "/analytics", label: "Análisis", icon: IconChartBar },
