@@ -33,7 +33,7 @@ def test_contains_rule(db):
 
     tx = Transaction(
         account_id=1,
-        date="2024-01-01",
+        transaction_date="2024-01-01",
         description="CARREFOUR PALERMO",
         description_normalized=normalize_description("CARREFOUR PALERMO"),
         amount=5000,
@@ -64,7 +64,7 @@ def test_regex_rule(db):
 
     tx = Transaction(
         account_id=1,
-        date="2024-01-01",
+        transaction_date="2024-01-01",
         description="YPF ESTACION 123",
         description_normalized=normalize_description("YPF ESTACION 123"),
         amount=10000,
@@ -81,7 +81,7 @@ def test_regex_rule(db):
 def test_no_match_returns_none(db):
     tx = Transaction(
         account_id=1,
-        date="2024-01-01",
+        transaction_date="2024-01-01",
         description="COMPRA GENERICA SIN REGLA",
         description_normalized=normalize_description("COMPRA GENERICA SIN REGLA"),
         amount=100,
