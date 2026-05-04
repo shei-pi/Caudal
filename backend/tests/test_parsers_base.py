@@ -1,14 +1,18 @@
 # TODO: implement app/ingestion/base.py (ParsedRow dataclass, BaseParser ABC)
 # TODO: implement app/ingestion/registry.py (detect_bank function)
 # TODO: implement app/ingestion/parsers/galicia.py (GaliciaParser)
+# TODO: implement app/ingestion/parsers/galicia_visa.py (GaliciaVisaParser)
 # TODO: implement app/ingestion/parsers/naranja_x.py (NaranjaXParser)
+# TODO: implement app/ingestion/parsers/mercado_pago.py (MercadoPagoParser)
 # TODO: implement app/ingestion/parsers/generic.py (GenericParser)
 
 from datetime import date
 
 from app.ingestion.base import BaseParser, ParsedRow
 from app.ingestion.parsers.galicia import GaliciaParser
+from app.ingestion.parsers.galicia_visa import GaliciaVisaParser
 from app.ingestion.parsers.generic import GenericParser
+from app.ingestion.parsers.mercado_pago import MercadoPagoParser
 from app.ingestion.parsers.naranja_x import NaranjaXParser
 from app.ingestion.registry import detect_bank
 
@@ -47,6 +51,19 @@ def test_detect_bank_returns_naranja_parser_for_naranja_text():
     text = "NARANJA X\nResumen de cuenta\nTarjeta de crédito"
     parser = detect_bank(text)
     assert isinstance(parser, NaranjaXParser)
+
+
+def test_detect_bank_returns_galicia_visa_parser_for_galicia_visa_text():
+    # Must match before generic Galicia CA/CC
+    text = "BANCO GALICIA S.A. — RESUMEN VISA PLATINUM"
+    parser = detect_bank(text)
+    assert isinstance(parser, GaliciaVisaParser)
+
+
+def test_detect_bank_returns_mercado_pago_parser_for_mp_text():
+    text = "MERCADO PAGO S.A.\nFecha,Descripción,Monto"
+    parser = detect_bank(text)
+    assert isinstance(parser, MercadoPagoParser)
 
 
 def test_detect_bank_returns_generic_parser_for_unknown_text():
