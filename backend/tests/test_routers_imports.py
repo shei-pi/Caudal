@@ -11,7 +11,7 @@ from datetime import date
 from unittest.mock import MagicMock, patch
 
 from app.models.import_job import ImportJob
-from app.ingestion.base import ParsedRow
+from app.ingestion.base import ParsedRow, ParseResult
 from tests.conftest import make_account, make_transaction
 
 
@@ -42,10 +42,18 @@ def _fake_pdf_file(filename: str = "estado_cuenta.pdf") -> tuple[str, bytes, str
     return ("file", b"%PDF-1.4 fake pdf content", filename)
 
 
-def _mock_parser(parsed_rows: list[ParsedRow]) -> MagicMock:
+def _mock_parser(
+    parsed_rows: list[ParsedRow],
+    statement_total: float | None = None,
+    total_kind: str | None = None,
+) -> MagicMock:
     mock = MagicMock()
     mock.bank_name = "Galicia"
-    mock.parse.return_value = parsed_rows
+    mock.parse.return_value = ParseResult(
+        rows=parsed_rows,
+        statement_total=statement_total,
+        total_kind=total_kind,
+    )
     return mock
 
 
@@ -352,3 +360,65 @@ def test_cancel_sets_job_status_to_cancelled(client, db):
     db.expire_all()
     job = db.get(ImportJob, job_id)
     assert job.status == "cancelled"
+
+
+# ---------------------------------------------------------------------------
+# Validation in upload response
+# ---------------------------------------------------------------------------
+
+
+def test_upload_response_includes_validation_object(client, db):
+    rows = _make_parsed_rows()
+    # debit 3500, credit 150000 → for "balance_diff" total: 150000-3500=146500
+    mock_parser = _mock_parser(rows, statement_total=146500.0, total_kind="balance_diff")
+    with patch("app.routers.imports.detect_bank", return_value=mock_parser):
+        response = client.post(
+            "/api/imports/upload",
+            files={"file": ("galicia.pdf", b"%PDF-1.4 content", "application/pdf")},
+        )
+    data = response.json()
+    assert "validation" in data
+    assert "is_valid" in data["validation"]
+    assert "expected" in data["validation"]
+    assert "actual" in data["validation"]
+    assert "difference" in data["validation"]
+
+
+def test_upload_validation_passes_when_totals_match(client, db):
+    rows = _make_parsed_rows()  # debit 3500, credit 150000
+    mock_parser = _mock_parser(rows, statement_total=146500.0, total_kind="balance_diff")
+    with patch("app.routers.imports.detect_bank", return_value=mock_parser):
+        response = client.post(
+            "/api/imports/upload",
+            files={"file": ("galicia.pdf", b"%PDF-1.4 content", "application/pdf")},
+        )
+    data = response.json()
+    assert data["validation"]["is_valid"] is True
+    assert data["validation"]["difference"] == 0
+
+
+def test_upload_validation_fails_with_difference_when_totals_mismatch(client, db):
+    rows = _make_parsed_rows()  # debit 3500, credit 150000 → diff would be 146500
+    # Statement claims 100000 → off by 46500
+    mock_parser = _mock_parser(rows, statement_total=100000.0, total_kind="balance_diff")
+    with patch("app.routers.imports.detect_bank", return_value=mock_parser):
+        response = client.post(
+            "/api/imports/upload",
+            files={"file": ("galicia.pdf", b"%PDF-1.4 content", "application/pdf")},
+        )
+    data = response.json()
+    assert data["validation"]["is_valid"] is False
+    assert data["validation"]["difference"] == 46500.0
+
+
+def test_upload_validation_passes_when_no_total_declared(client, db):
+    rows = _make_parsed_rows()
+    mock_parser = _mock_parser(rows, statement_total=None, total_kind=None)
+    with patch("app.routers.imports.detect_bank", return_value=mock_parser):
+        response = client.post(
+            "/api/imports/upload",
+            files={"file": ("mp.csv", b"csv content", "text/csv")},
+        )
+    data = response.json()
+    assert data["validation"]["is_valid"] is True
+    assert data["validation"]["expected"] is None

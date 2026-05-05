@@ -2,6 +2,10 @@
 # Naranja X is a credit card — all parsed rows are tx_type="debit" (purchases = expenses).
 # Text format per line: "01/04  PEDIDOS YA BUENOS AIRES     $2.500,00"
 # Pattern: r'(\d{2}/\d{2})\s{2,}(.+?)\s{2,}\$\s*([\d.,]+)'
+# parse() returns ParseResult with:
+#   - rows: list[ParsedRow]
+#   - statement_total: total period charges (extracted from "TOTAL DEL PERÍODO" / "TOTAL CONSUMOS")
+#   - total_kind: "charges" — validation: sum(debits) - sum(credits) == statement_total
 
 from datetime import date
 from unittest.mock import MagicMock, patch
@@ -43,8 +47,8 @@ def test_naranja_all_parsed_rows_are_debit():
     with patch("pdfplumber.open", return_value=mock_pdf):
         result = parser.parse("dummy.pdf")
 
-    assert len(result) == 3
-    assert all(row.tx_type == "debit" for row in result)
+    assert len(result.rows) == 3
+    assert all(row.tx_type == "debit" for row in result.rows)
 
 
 def test_naranja_parses_amount_with_peso_sign():
@@ -57,8 +61,8 @@ def test_naranja_parses_amount_with_peso_sign():
     with patch("pdfplumber.open", return_value=mock_pdf):
         result = parser.parse("dummy.pdf")
 
-    assert len(result) == 1
-    assert result[0].amount == 2500.0
+    assert len(result.rows) == 1
+    assert result.rows[0].amount == 2500.0
 
 
 def test_naranja_parses_date_ddmm_uses_pdf_year():
@@ -71,8 +75,8 @@ def test_naranja_parses_date_ddmm_uses_pdf_year():
     with patch("pdfplumber.open", return_value=mock_pdf):
         result = parser.parse("dummy.pdf")
 
-    assert len(result) == 1
-    assert result[0].transaction_date == date(2025, 4, 1)
+    assert len(result.rows) == 1
+    assert result.rows[0].transaction_date == date(2025, 4, 1)
 
 
 def test_naranja_skips_non_matching_lines():
@@ -80,7 +84,7 @@ def test_naranja_skips_non_matching_lines():
         "NARANJA X\n"
         "Resumen de Cuenta - Período Abril 2025\n"
         "Fecha  Descripción  Importe\n"
-        "TOTAL DEL PERÍODO:  $15.799,00\n"
+        "TOTAL DEL PERÍODO:  $15.599,00\n"
         "01/04  PEDIDOS YA BUENOS AIRES     $2.500,00\n"
         "Vencimiento: 30/04/2025\n"
     )
@@ -89,5 +93,41 @@ def test_naranja_skips_non_matching_lines():
     with patch("pdfplumber.open", return_value=mock_pdf):
         result = parser.parse("dummy.pdf")
 
-    assert len(result) == 1
-    assert result[0].description == "PEDIDOS YA BUENOS AIRES"
+    assert len(result.rows) == 1
+    assert result.rows[0].description == "PEDIDOS YA BUENOS AIRES"
+
+
+# --------------------------------------------------------------------------- #
+#  Statement total extraction (for validation)                                #
+# --------------------------------------------------------------------------- #
+
+def test_naranja_extracts_total_period_charges():
+    # 2.500 + 799 + 12.300 = 15.599
+    text = (
+        "NARANJA X\n"
+        "Resumen de Cuenta - Período Abril 2025\n"
+        "01/04  PEDIDOS YA BUENOS AIRES     $2.500,00\n"
+        "05/04  SPOTIFY ARGENTINA           $799,00\n"
+        "10/04  MERCADO LIBRE SA            $12.300,00\n"
+        "TOTAL DEL PERÍODO:  $15.599,00\n"
+    )
+    mock_pdf = _make_naranja_pdf_mock(text, year=2025)
+    parser = NaranjaXParser()
+    with patch("pdfplumber.open", return_value=mock_pdf):
+        result = parser.parse("dummy.pdf")
+
+    assert result.total_kind == "charges"
+    assert result.statement_total == 15599.0
+
+
+def test_naranja_statement_total_none_when_not_found():
+    text = (
+        "NARANJA X\n"
+        "01/04  COMPRA SUELTA               $1.000,00\n"
+    )
+    mock_pdf = _make_naranja_pdf_mock(text, year=2025)
+    parser = NaranjaXParser()
+    with patch("pdfplumber.open", return_value=mock_pdf):
+        result = parser.parse("dummy.pdf")
+
+    assert result.statement_total is None

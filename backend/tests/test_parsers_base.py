@@ -8,7 +8,7 @@
 
 from datetime import date
 
-from app.ingestion.base import BaseParser, ParsedRow
+from app.ingestion.base import BaseParser, ParsedRow, ParseResult
 from app.ingestion.parsers.galicia import GaliciaParser
 from app.ingestion.parsers.galicia_visa import GaliciaVisaParser
 from app.ingestion.parsers.generic import GenericParser
@@ -39,6 +39,24 @@ def test_parsed_row_currency_defaults_to_ars():
     )
     assert row.currency == "ARS"
     assert row.notes is None
+
+
+def test_parse_result_holds_rows_and_optional_total():
+    rows = [
+        ParsedRow(transaction_date=date(2025, 4, 1), description="X", amount=100.0, tx_type="debit"),
+    ]
+    result = ParseResult(rows=rows, statement_total=100.0, total_kind="charges")
+    assert result.rows == rows
+    assert result.statement_total == 100.0
+    assert result.total_kind == "charges"
+
+
+def test_parse_result_defaults_when_only_rows_provided():
+    result = ParseResult(rows=[])
+    assert result.statement_total is None
+    assert result.total_kind is None
+    assert result.period_start is None
+    assert result.period_end is None
 
 
 def test_detect_bank_returns_galicia_parser_for_galicia_text():

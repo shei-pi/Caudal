@@ -5,6 +5,10 @@
 #   Date is dd/mm — year extracted from statement header text
 #   All charges are tx_type="debit" (expenses); card payments are tx_type="credit"
 #   Detection: text contains "GALICIA" AND "VISA" (distinguishes from CA/CC)
+# parse() returns ParseResult with:
+#   - rows: list[ParsedRow]
+#   - statement_total: total period charges (extracted from "TOTAL DEL PERIODO" / "TOTAL CONSUMOS")
+#   - total_kind: "charges" — validation: sum(debits) - sum(credits) == statement_total
 
 from datetime import date
 from unittest.mock import MagicMock, patch
@@ -33,7 +37,6 @@ def test_galicia_visa_can_parse_when_text_contains_galicia_and_visa():
 
 
 def test_galicia_visa_cannot_parse_galicia_ca_without_visa():
-    # Galicia CA/CC does NOT say VISA — must not be matched by this parser
     parser = GaliciaVisaParser()
     assert parser.can_parse("BANCO GALICIA S.A. — CAJA DE AHORRO EN PESOS") is False
 
@@ -54,8 +57,8 @@ def test_galicia_visa_all_purchases_are_debit():
     with patch("pdfplumber.open", return_value=mock_pdf):
         result = parser.parse("dummy.pdf")
 
-    assert len(result) == 2
-    assert all(r.tx_type == "debit" for r in result)
+    assert len(result.rows) == 2
+    assert all(r.tx_type == "debit" for r in result.rows)
 
 
 def test_galicia_visa_payment_to_card_is_credit():
@@ -68,9 +71,9 @@ def test_galicia_visa_payment_to_card_is_credit():
     with patch("pdfplumber.open", return_value=mock_pdf):
         result = parser.parse("dummy.pdf")
 
-    assert len(result) == 1
-    assert result[0].tx_type == "credit"
-    assert result[0].amount == 15000.0
+    assert len(result.rows) == 1
+    assert result.rows[0].tx_type == "credit"
+    assert result.rows[0].amount == 15000.0
 
 
 def test_galicia_visa_parses_argentine_number_format():
@@ -83,11 +86,10 @@ def test_galicia_visa_parses_argentine_number_format():
     with patch("pdfplumber.open", return_value=mock_pdf):
         result = parser.parse("dummy.pdf")
 
-    assert result[0].amount == 12350.50
+    assert result.rows[0].amount == 12350.50
 
 
 def test_galicia_visa_infers_year_from_header_text():
-    # Header says 2025 — dates like "15/04" should become date(2025, 4, 15)
     rows = [
         ["FECHA", "ESTABLECIMIENTO", "CUOTAS", "IMPORTE"],
         ["15/04", "SPOTIFY", "1/1", "600,00"],
@@ -97,7 +99,7 @@ def test_galicia_visa_infers_year_from_header_text():
     with patch("pdfplumber.open", return_value=mock_pdf):
         result = parser.parse("dummy.pdf")
 
-    assert result[0].transaction_date == date(2025, 4, 15)
+    assert result.rows[0].transaction_date == date(2025, 4, 15)
 
 
 def test_galicia_visa_skips_rows_without_valid_date():
@@ -112,14 +114,51 @@ def test_galicia_visa_skips_rows_without_valid_date():
     with patch("pdfplumber.open", return_value=mock_pdf):
         result = parser.parse("dummy.pdf")
 
-    assert len(result) == 1
-    assert result[0].description == "UBER"
+    assert len(result.rows) == 1
+    assert result.rows[0].description == "UBER"
 
 
-def test_galicia_visa_returns_empty_list_when_no_tables():
+def test_galicia_visa_returns_empty_result_when_no_tables():
     mock_pdf = _make_visa_pdf_mock([[]])
     parser = GaliciaVisaParser()
     with patch("pdfplumber.open", return_value=mock_pdf):
         result = parser.parse("dummy.pdf")
 
-    assert result == []
+    assert result.rows == []
+
+
+# --------------------------------------------------------------------------- #
+#  Statement total extraction (for validation)                                #
+# --------------------------------------------------------------------------- #
+
+def test_galicia_visa_extracts_total_period_charges():
+    # Two purchases of 2500 + 850 = 3350; statement says TOTAL DEL PERIODO 3.350,00
+    header = (
+        "BANCO GALICIA VISA — RESUMEN ABRIL 2025\n"
+        "TOTAL DEL PERIODO: $ 3.350,00\n"
+    )
+    rows = [
+        ["FECHA", "ESTABLECIMIENTO", "CUOTAS", "IMPORTE"],
+        ["01/04", "AMAZON.COM.BR", "1/1", "2.500,00"],
+        ["03/04", "NETFLIX", "1/1", "850,00"],
+    ]
+    mock_pdf = _make_visa_pdf_mock([rows], header_text=header)
+    parser = GaliciaVisaParser()
+    with patch("pdfplumber.open", return_value=mock_pdf):
+        result = parser.parse("dummy.pdf")
+
+    assert result.total_kind == "charges"
+    assert result.statement_total == 3350.0
+
+
+def test_galicia_visa_statement_total_none_when_not_found():
+    rows = [
+        ["FECHA", "ESTABLECIMIENTO", "CUOTAS", "IMPORTE"],
+        ["10/04", "TIENDA", "1/1", "1.000,00"],
+    ]
+    mock_pdf = _make_visa_pdf_mock([rows], header_text="VISA GALICIA — sin total")
+    parser = GaliciaVisaParser()
+    with patch("pdfplumber.open", return_value=mock_pdf):
+        result = parser.parse("dummy.pdf")
+
+    assert result.statement_total is None

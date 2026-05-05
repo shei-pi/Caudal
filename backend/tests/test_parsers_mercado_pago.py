@@ -68,9 +68,9 @@ def test_mercado_pago_negative_amount_is_debit(tmp_path):
     parser = MercadoPagoParser()
     result = parser.parse(str(csv_file))
 
-    assert len(result) == 1
-    assert result[0].tx_type == "debit"
-    assert result[0].amount == 1500.0
+    assert len(result.rows) == 1
+    assert result.rows[0].tx_type == "debit"
+    assert result.rows[0].amount == 1500.0
 
 
 def test_mercado_pago_positive_amount_is_credit(tmp_path):
@@ -82,9 +82,9 @@ def test_mercado_pago_positive_amount_is_credit(tmp_path):
     parser = MercadoPagoParser()
     result = parser.parse(str(csv_file))
 
-    assert len(result) == 1
-    assert result[0].tx_type == "credit"
-    assert result[0].amount == 2000.0
+    assert len(result.rows) == 1
+    assert result.rows[0].tx_type == "credit"
+    assert result.rows[0].amount == 2000.0
 
 
 def test_mercado_pago_parses_iso_datetime_to_date(tmp_path):
@@ -96,7 +96,7 @@ def test_mercado_pago_parses_iso_datetime_to_date(tmp_path):
     parser = MercadoPagoParser()
     result = parser.parse(str(csv_file))
 
-    assert result[0].transaction_date == date(2025, 4, 1)
+    assert result.rows[0].transaction_date == date(2025, 4, 1)
 
 
 def test_mercado_pago_parses_usd_currency(tmp_path):
@@ -108,7 +108,7 @@ def test_mercado_pago_parses_usd_currency(tmp_path):
     parser = MercadoPagoParser()
     result = parser.parse(str(csv_file))
 
-    assert result[0].currency == "USD"
+    assert result.rows[0].currency == "USD"
 
 
 def test_mercado_pago_skips_rows_with_missing_amount(tmp_path):
@@ -123,8 +123,8 @@ def test_mercado_pago_skips_rows_with_missing_amount(tmp_path):
     parser = MercadoPagoParser()
     result = parser.parse(str(csv_file))
 
-    assert len(result) == 1
-    assert result[0].description == "Gasto válido"
+    assert len(result.rows) == 1
+    assert result.rows[0].description == "Gasto válido"
 
 
 def test_mercado_pago_multiple_rows_parsed_in_order(tmp_path):
@@ -140,9 +140,26 @@ def test_mercado_pago_multiple_rows_parsed_in_order(tmp_path):
     parser = MercadoPagoParser()
     result = parser.parse(str(csv_file))
 
-    assert len(result) == 3
-    assert result[0].description == "Compra A"
-    assert result[2].tx_type == "credit"
+    assert len(result.rows) == 3
+    assert result.rows[0].description == "Compra A"
+    assert result.rows[2].tx_type == "credit"
+
+
+# --------------------------------------------------------------------------- #
+#  CSV has no statement total                                                 #
+# --------------------------------------------------------------------------- #
+
+def test_mercado_pago_csv_has_no_statement_total(tmp_path):
+    csv_file = tmp_path / "mp.csv"
+    csv_file.write_text(
+        _csv_content("2025-04-01 08:00:00,Pago,Pago,-500.00,ARS"),
+        encoding="utf-8",
+    )
+    parser = MercadoPagoParser()
+    result = parser.parse(str(csv_file))
+
+    assert result.statement_total is None
+    assert result.total_kind is None
 
 
 # --------------------------------------------------------------------------- #
