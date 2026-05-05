@@ -11,6 +11,7 @@ from app.routers import (
     categories,
     exchange_rates,
     holdings,
+    imports,
     instruments,
     rules,
     transactions,
@@ -49,6 +50,7 @@ app.include_router(exchange_rates.router)
 app.include_router(instruments.router)
 app.include_router(holdings.router)
 app.include_router(analytics.router)
+app.include_router(imports.router)
 
 
 @app.get("/health")
